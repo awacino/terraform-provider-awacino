@@ -5,7 +5,7 @@
 terraform {
   required_version = ">= 1.5"
   required_providers {
-    awacino = { source = "awacino/awacino", version = "~> 0.1" }
+    awacino = { source = "awacino/awacino", version = "~> 1.0" }
     hcloud  = { source = "hetznercloud/hcloud", version = "~> 1.48" }
   }
 }

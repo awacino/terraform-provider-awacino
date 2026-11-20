@@ -12,7 +12,7 @@ terraform {
   required_providers {
     awacino = {
       source  = "awacino/awacino"
-      version = "~> 0.1"
+      version = "~> 1.0"
     }
   }
 }
