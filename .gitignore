@@ -1,0 +1,9 @@
+dist/
+/terraform-provider-awacino
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+crash.log
+*.tfvars
+*.tfvars.json

@@ -1,0 +1,17 @@
+#cloud-config
+# Without Terraform: the unattended Awacino client as a container, set up with a one-time setup code.
+# Get the code (and this document ready-made, as install.cloud_init) from the API:
+#   curl -X POST https://api.awacino.net/v1/enrolments \
+#     -H "X-Awacino-Key-Id: $AWACINO_KEY_ID" -H "X-Awacino-Key-Secret: $AWACINO_KEY_SECRET" \
+#     -H "Idempotency-Key: $(uuidgen)" -H "Content-Type: application/json" \
+#     -d '{"label": "web-02.example.com", "hours": 2}'
+# then replace ${AWACINO_SETUP_CODE} below with the answer's "code".
+package_update: true
+packages: [docker.io]
+runcmd:
+  - >-
+    docker run -d --name awacino-unattended --restart unless-stopped
+    --network host --pid host --privileged --cap-add NET_ADMIN
+    -e AWACINO_SETUP_CODE="${AWACINO_SETUP_CODE}"
+    -v awacino-data:/opt/awabon
+    docker.awacino.net/awacino/unattended:latest

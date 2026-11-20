@@ -1,0 +1,93 @@
+# Build, unit tests (mock API + the examples through the real Terraform CLI) and a docs check on every push
+# and pull request; acceptance tests against the Awacino API nightly and on demand.
+#
+# Acceptance secrets (optional; the job is skipped without them):
+#   AWACINO_KEY_ID, AWACINO_KEY_SECRET  key of the dedicated test company "Awacino Terraform acceptance"
+#                                       (Premium, sections Users + Connections, Read + Write)
+#   AWACINO_TEST_DEVICE_ID              a Beam-in device of that company
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go build ./...
+      - run: go vet ./...
+      - name: gofmt
+        run: test -z "$(gofmt -l .)"
+
+  unit:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        terraform: ["1.5.*", "1.11.*", "latest"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ matrix.terraform }}
+          terraform_wrapper: false
+      - run: go test ./... -count=1
+        env:
+          TF_ACC: ""
+
+  docs:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - run: go tool tfplugindocs generate --provider-name awacino
+      - name: docs/ is up to date
+        run: git diff --exit-code -- docs/
+
+  acceptance:
+    needs: unit
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    concurrency: acceptance
+    env:
+      TF_ACC: "1"
+      AWACINO_KEY_ID: ${{ secrets.AWACINO_KEY_ID }}
+      AWACINO_KEY_SECRET: ${{ secrets.AWACINO_KEY_SECRET }}
+      AWACINO_TEST_DEVICE_ID: ${{ secrets.AWACINO_TEST_DEVICE_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - name: Acceptance tests
+        if: env.AWACINO_KEY_ID != ''
+        run: go test ./internal/provider/ -run TestAcc -v -count=1 -timeout 60m

@@ -1,0 +1,54 @@
+---
+page_title: "Provider: Awacino"
+description: |-
+  The official provider for the Awacino API: members and invitation codes, Beam-in devices (server enrolment), access grants and Beam-in codes of an Awacino company account.
+---
+
+# Awacino Provider
+
+The official provider for the [Awacino API](https://www.awacino.com). Automate your Awacino company account:
+
+- **Members** of the company and their invitation codes (`awacino_member`, `awacino_invitation`) - offboarded on destroy;
+- **Beam-in devices**: a one-time setup code with ready `cloud_init`, `docker` and `apt` install lines for a new server (`awacino_beamin_device`);
+- **Access grants**: which Beam-in devices a member may use, how far and until when (`awacino_access_grant`);
+- **Beam-in codes** for your customers, limited to a network, a device or some ports (`awacino_beamin_code`);
+- read the company, its members, devices, live connections and the calling key (data sources).
+
+The provider works with Terraform and OpenTofu and uses only the public API (`https://api.awacino.net/v1`).
+
+## API key
+
+An admin creates the key in the Awacino app: **Company settings > Awacino API > New API key** (MAIN-ADMIN or ADMIN, confirmed with
+an authenticator app or a passkey). Tick the sections the configuration needs:
+
+| Section | Needed for |
+|---|---|
+| **Users** (Read + Write) | `awacino_member`, `awacino_invitation`, `awacino_members`, `awacino_member` |
+| **Connections** (Read + Write) | `awacino_beamin_device`, `awacino_access_grant`, `awacino_beamin_code`, `awacino_devices`, `awacino_device`, `awacino_active_connections` |
+
+The API needs the **API Access** package (included in Premium); access grants also need **Management**. A missing section is
+reported with the checkbox to tick. The provider exchanges the key for a 15-minute bearer token (`POST /v1/oauth/token`), renews
+it before it ends, retries `429` and `5xx` answers with back-off and sends an `Idempotency-Key` on every write, so a retry never
+creates a second object.
+
+## Example Usage
+
+{{ tffile "examples/provider/provider.tf" }}
+
+## Codes in the state
+
+Invitation codes, setup codes and Beam-in codes are returned by the API **once**, on create. The provider keeps them in the
+state as sensitive values (`invitation_code`, `join_url`, `code`, `connect_url`, `setup_code`, `install_*`, `cloud_init`), so
+your pipeline can hand them on. Keep your state in an encrypted backend with restricted access. A code is never read back from
+the API; an imported resource has no code.
+
+## Full examples
+
+- [Onboard a new office](https://github.com/awacino/terraform-provider-awacino/tree/main/examples/onboard-office) - members with
+  invitation mails, the office server's setup code, grants to the office devices, a Beam-in code for the IT partner.
+- [A hoster](https://github.com/awacino/terraform-provider-awacino/tree/main/examples/hoster) - setup code, cloud server with
+  `cloud_init`, wait for the device, a Beam-in code for the customer.
+- [A managed service provider](https://github.com/awacino/terraform-provider-awacino/tree/main/examples/managed-service-provider) -
+  a technician with access to two customer devices until the contract ends.
+
+{{ .SchemaMarkdown | trimspace }}

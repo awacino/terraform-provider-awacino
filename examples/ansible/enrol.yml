@@ -1,0 +1,30 @@
+# Without Terraform: enrol a host with Ansible.
+#   ansible-playbook -i inventory enrol.yml -e awacino_key_id=... -e awacino_key_secret=...
+# (better: put the key into Ansible Vault)
+- name: Enrol hosts as Awacino Beam-in devices
+  hosts: servers
+  become: true
+  tasks:
+    - name: One-time Awacino setup code for this host
+      ansible.builtin.uri:
+        url: https://api.awacino.net/v1/enrolments
+        method: POST
+        headers:
+          X-Awacino-Key-Id: "{{ awacino_key_id }}"
+          X-Awacino-Key-Secret: "{{ awacino_key_secret }}"
+          Idempotency-Key: "enrol-{{ inventory_hostname }}"
+        body_format: json
+        body:
+          label: "{{ inventory_hostname }}"
+          external_id: "{{ inventory_hostname }}"
+          hours: 2
+        status_code: [200, 201]
+      register: enrol
+      delegate_to: localhost
+      become: false
+      no_log: true
+
+    - name: Install the Awacino client with it
+      ansible.builtin.shell: "{{ enrol.json.install.apt }}"
+      when: enrol.json.install is defined and enrol.json.install.apt != 'code_redacted'
+      no_log: true
